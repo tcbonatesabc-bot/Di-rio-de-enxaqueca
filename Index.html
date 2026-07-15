@@ -1,0 +1,1186 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="theme-color" content="#14161f">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Enxaqueca">
+<title>Diário de Enxaqueca</title>
+<style>
+:root{
+  --bg:#14161f; --surface:#1d2030; --surface2:#262a3d; --line:#31364d;
+  --text:#e8e6f0; --muted:#9aa0b8; --accent:#8fb4ff; --accent-dim:#3a4a75;
+  --ok:#7fd6a4; --warn:#f0b46a; --danger:#ef8b8b;
+  --radius:16px;
+}
+*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+html{color-scheme:dark;}
+body{
+  font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;
+  background:var(--bg); color:var(--text);
+  max-width:520px; margin:0 auto;
+  padding:16px 16px calc(84px + env(safe-area-inset-bottom));
+  font-size:15px; line-height:1.45;
+}
+.header{display:flex;justify-content:space-between;align-items:baseline;margin:4px 0 16px;}
+.header h1{font-size:24px;font-weight:800;letter-spacing:-0.4px;}
+.header h1 span{color:var(--accent);}
+.badge{background:var(--surface2);color:var(--muted);padding:4px 12px;border-radius:20px;font-size:12px;}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);padding:18px;margin-bottom:14px;}
+.card h3{font-size:16px;font-weight:700;margin-bottom:10px;}
+.hint{font-size:13px;color:var(--muted);margin-bottom:10px;}
+.page{display:none;}
+.page.active{display:block;animation:fade .18s ease;}
+@keyframes fade{from{opacity:0;transform:translateY(4px);}to{opacity:1;transform:none;}}
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important;}}
+
+/* Botões */
+.btn{border:none;border-radius:12px;padding:13px 16px;font-size:15px;font-weight:600;cursor:pointer;color:var(--text);background:var(--surface2);width:100%;}
+.btn:active{transform:scale(.98);}
+.btn-primary{background:var(--accent);color:#10131f;}
+.btn-danger{background:transparent;border:1px solid var(--danger);color:var(--danger);}
+.btn-ghost{background:transparent;border:1px solid var(--line);color:var(--muted);}
+.flex-row{display:flex;gap:8px;}
+.flex-row .btn{flex:1;}
+
+/* Card de instalação */
+#installCard{border-color:var(--accent-dim);}
+#installCard .ico-big{font-size:26px;margin-bottom:6px;}
+
+/* Toast (mensagem rápida) */
+#toast{
+  position:fixed;left:50%;transform:translateX(-50%) translateY(20px);
+  bottom:calc(92px + env(safe-area-inset-bottom));
+  background:var(--surface2);border:1px solid var(--line);color:var(--text);
+  padding:11px 20px;border-radius:24px;font-size:13.5px;font-weight:600;
+  z-index:200;box-shadow:0 6px 20px rgba(0,0,0,.5);
+  opacity:0;pointer-events:none;transition:opacity .2s ease, transform .2s ease;
+  max-width:88%;text-align:center;
+}
+#toast.show{opacity:1;transform:translateX(-50%) translateY(0);}
+
+/* Tabs */
+.tab-bar{
+  position:fixed;left:0;right:0;bottom:0;margin:0 auto;max-width:520px;
+  display:flex;background:rgba(20,22,31,.92);backdrop-filter:blur(12px);
+  border-top:1px solid var(--line);padding:6px 4px calc(6px + env(safe-area-inset-bottom));z-index:50;
+}
+.tab-bar button{flex:1;background:none;border:none;color:var(--muted);font-size:11px;padding:6px 2px;border-radius:10px;cursor:pointer;}
+.tab-bar button .ico{display:block;font-size:20px;margin-bottom:2px;}
+.tab-bar button.active{color:var(--accent);}
+
+/* ===== Assistente (conversa) ===== */
+.chat{min-height:120px;max-height:44vh;overflow-y:auto;display:flex;flex-direction:column;gap:8px;padding:4px 0;}
+.bubble{max-width:88%;padding:10px 14px;border-radius:14px;font-size:14px;}
+.bubble.q{background:var(--surface2);align-self:flex-start;border-bottom-left-radius:4px;}
+.bubble.a{background:var(--accent-dim);align-self:flex-end;border-bottom-right-radius:4px;}
+.bubble.sys{background:transparent;color:var(--muted);font-size:12.5px;align-self:center;text-align:center;}
+.bubble.ok{background:transparent;color:var(--ok);font-weight:700;align-self:center;}
+
+.chips{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px;}
+.chip{
+  background:var(--surface2);border:1px solid var(--line);color:var(--text);
+  padding:11px 16px;border-radius:24px;font-size:14.5px;font-weight:600;cursor:pointer;
+  min-height:44px;
+}
+.chip:active{background:var(--accent-dim);}
+.chip.sel{background:var(--accent);color:#10131f;border-color:var(--accent);}
+.chips.grid10{display:grid;grid-template-columns:repeat(6,1fr);gap:8px;}
+.chips.grid10 .chip{padding:11px 0;text-align:center;border-radius:12px;}
+
+/* Orbe do microfone */
+.mic-row{display:flex;align-items:center;gap:12px;margin-top:14px;}
+.mic-orb{
+  width:56px;height:56px;border-radius:50%;border:none;cursor:pointer;flex:none;
+  background:var(--surface2);border:1px solid var(--line);font-size:24px;color:var(--text);
+  display:flex;align-items:center;justify-content:center;
+}
+.mic-orb.listening{background:var(--accent);color:#10131f;animation:pulse 1.4s ease infinite;}
+.mic-orb.speaking{background:var(--warn);color:#10131f;}
+@keyframes pulse{0%{box-shadow:0 0 0 0 rgba(143,180,255,.45);}70%{box-shadow:0 0 0 16px rgba(143,180,255,0);}100%{box-shadow:0 0 0 0 rgba(143,180,255,0);}}
+.mic-state{font-size:13px;color:var(--muted);flex:1;}
+.partial{font-size:14px;color:var(--accent);min-height:20px;margin-top:6px;}
+
+.session-actions{display:flex;gap:8px;margin-top:12px;}
+.session-actions .btn{padding:10px;font-size:13.5px;}
+
+/* Formulários */
+.form-group{margin-bottom:14px;}
+.form-group label{display:block;font-size:13px;color:var(--muted);margin-bottom:6px;font-weight:600;}
+input[type=text],input[type=date],input[type=time],input[type=month],select,textarea{
+  width:100%;background:var(--surface2);border:1px solid var(--line);border-radius:10px;
+  color:var(--text);padding:12px;font-size:15px;font-family:inherit;
+}
+textarea{min-height:70px;resize:vertical;}
+input[type=range]{width:100%;accent-color:var(--accent);}
+input:disabled,select:disabled{opacity:.45;}
+.range-labels{display:flex;justify-content:space-between;font-size:12px;color:var(--muted);}
+.range-labels b{color:var(--accent);font-size:15px;}
+.check-row{display:flex;align-items:center;gap:8px;background:var(--surface2);border:1px solid var(--line);border-radius:10px;padding:12px;}
+.check-row input{width:20px;height:20px;accent-color:var(--accent);}
+.form-row{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
+
+/* Lista */
+.list-item{background:var(--surface2);border-radius:12px;padding:12px;margin-bottom:10px;}
+.list-item .date{font-weight:700;font-size:14px;margin-bottom:6px;}
+.tags{display:flex;flex-wrap:wrap;gap:6px;}
+.tags span{background:var(--bg);border:1px solid var(--line);padding:3px 10px;border-radius:10px;font-size:12px;color:var(--muted);}
+.flex-between{display:flex;justify-content:space-between;align-items:center;}
+.pill{font-size:11px;padding:2px 10px;border-radius:10px;background:var(--line);}
+.pill.pain{background:#4a2e3a;color:var(--danger);}
+.del-btn{margin-top:8px;background:none;border:1px solid var(--line);color:var(--danger);padding:5px 14px;border-radius:8px;font-size:12px;cursor:pointer;}
+.empty-state{color:var(--muted);font-size:13.5px;text-align:center;padding:18px 0;}
+
+/* Resumo */
+.stats-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:14px;}
+.stat-item{background:var(--surface2);border-radius:12px;padding:12px 6px;text-align:center;}
+.stat-item .number{font-size:22px;font-weight:800;color:var(--accent);}
+.stat-item .label{font-size:11px;color:var(--muted);}
+.chart-container{display:flex;align-items:flex-end;gap:2px;height:110px;overflow-x:auto;padding-top:6px;}
+.bar-wrapper{display:flex;flex-direction:column;align-items:center;flex:1;min-width:9px;}
+.bar{width:100%;border-radius:3px 3px 0 0;min-height:2px;background:var(--line);}
+.bar-label{font-size:8.5px;color:var(--muted);margin-top:3px;}
+.status-ok{color:var(--ok);font-size:13px;margin-top:8px;}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px;}
+</style>
+</head>
+<body>
+
+<div class="header">
+  <h1>Diário de <span>Enxaqueca</span></h1>
+  <span class="badge" id="totalEntries">0 registros</span>
+</div>
+
+<div id="toast" role="status" aria-live="polite"></div>
+
+<!-- INÍCIO -->
+<div id="page-home" class="page active">
+
+  <div class="card" id="installCard" style="display:none;">
+    <div class="ico-big">📲</div>
+    <h3>Instalar como aplicativo</h3>
+    <p class="hint">Instale na tela inicial: o app abre em tela cheia, com ícone próprio, e a permissão do microfone é pedida <b>uma única vez</b>.</p>
+    <button class="btn btn-primary" id="installBtn">📥 Instalar app</button>
+    <p class="hint" id="installManualHint" style="display:none;margin-top:10px;">Se o botão não funcionar: toque no menu <b>⋮</b> do Chrome → <b>"Adicionar à tela inicial"</b> ou <b>"Instalar app"</b>.</p>
+  </div>
+
+  <div class="card">
+    <h3>Registrar agora</h3>
+    <p class="hint">Um toque para começar. Responda falando ou tocando nas opções — sem login, sem cadastro.</p>
+    <button class="btn btn-primary" id="quickStartBtn">🎙️ Iniciar registro guiado</button>
+  </div>
+  <div class="card">
+    <h3>Último registro</h3>
+    <div id="lastEntryPreview"><div class="empty-state">Nenhum registro ainda.</div></div>
+  </div>
+  <div class="card">
+    <h3>Lembrete diário</h3>
+    <p class="hint">O app avisa no horário escolhido (com esta página aberta).</p>
+    <div class="flex-row">
+      <input type="time" id="reminderTime" value="20:00">
+      <button class="btn btn-primary" id="setReminderBtn" style="flex:0 0 auto;width:auto;">Ativar</button>
+      <button class="btn btn-ghost" id="clearReminderBtn" style="flex:0 0 auto;width:auto;">Desativar</button>
+    </div>
+    <div class="status-ok" id="reminderStatus"></div>
+  </div>
+  <div class="card">
+    <h3>Compartilhar o app</h3>
+    <p class="hint">Envie para conhecidos ou pacientes. Cada pessoa instala no próprio celular e os dados dela ficam privados, só no aparelho dela.</p>
+    <button class="btn btn-primary" id="shareBtn">📤 Compartilhar link do app</button>
+  </div>
+</div>
+
+<!-- ASSISTENTE -->
+<div id="page-voice" class="page">
+  <div class="card">
+    <h3>Registro guiado</h3>
+    <p class="hint" id="voiceHint">Responda por voz ou toque nas opções. As perguntas se adaptam às suas respostas: dias sem sintomas terminam em segundos.</p>
+
+    <button class="btn btn-primary" id="startSessionBtn">🎙️ Começar</button>
+
+    <div id="sessionArea" style="display:none;">
+      <div class="chat" id="chatLog"></div>
+      <div class="chips" id="chipArea"></div>
+      <div class="partial" id="partialText"></div>
+      <div class="mic-row">
+        <button class="mic-orb" id="micOrb" aria-label="Falar resposta">🎤</button>
+        <div class="mic-state" id="micState">Toque no microfone para falar, ou escolha uma opção.</div>
+      </div>
+      <div class="session-actions">
+        <button class="btn btn-ghost" id="backStepBtn">↩️ Voltar</button>
+        <button class="btn btn-danger" id="cancelSessionBtn">Cancelar</button>
+      </div>
+    </div>
+
+    <div class="check-row" style="margin-top:14px;">
+      <input type="checkbox" id="ttsToggle" checked>
+      <label for="ttsToggle" style="font-size:13.5px;color:var(--muted);">Ler as perguntas em voz alta</label>
+    </div>
+    <div class="check-row" style="margin-top:8px;">
+      <input type="checkbox" id="autoListenToggle" checked>
+      <label for="autoListenToggle" style="font-size:13.5px;color:var(--muted);">Escutar automaticamente após cada pergunta</label>
+    </div>
+  </div>
+</div>
+
+<!-- MANUAL -->
+<div id="page-manual" class="page">
+  <div class="card">
+    <h3>Preencher manualmente</h3>
+    <form id="manualForm">
+      <div class="form-group"><label>Data</label><input type="date" id="manualDate" required></div>
+      <div class="form-row">
+        <div class="form-group"><label>Teve dor de cabeça?</label>
+          <div class="check-row"><input type="checkbox" id="manualPain" checked><span>Sim</span></div></div>
+        <div class="form-group"><label>Teve enxaqueca?</label>
+          <div class="check-row"><input type="checkbox" id="manualMigraine"><span>Sim</span></div></div>
+      </div>
+      <div class="form-group"><label>Intensidade da dor (0 a 10)</label>
+        <input type="range" id="manualIntensity" min="0" max="10" value="5" step="1">
+        <div class="range-labels"><span>0</span><b id="manualIntensityDisplay">5</b><span>10</span></div>
+      </div>
+      <div class="form-group"><label>Duração</label>
+        <select id="manualDuration">
+          <option value="< 1h">Menos de 1 hora</option>
+          <option value="1-4h" selected>1 a 4 horas</option>
+          <option value="4-12h">4 a 12 horas</option>
+          <option value="12-24h">12 a 24 horas</option>
+          <option value="> 24h">Mais de 24 horas</option>
+          <option value="Não se aplica">Não se aplica</option>
+        </select></div>
+      <div class="form-group"><label>Localização</label>
+        <select id="manualLocation">
+          <option value="Frontal">Frontal (testa)</option>
+          <option value="Temporal">Temporal (laterais)</option>
+          <option value="Occipital">Occipital (nuca)</option>
+          <option value="Olhos">Atrás/ao redor dos olhos</option>
+          <option value="Cervical">Cervical (pescoço)</option>
+          <option value="Generalizada">Generalizada</option>
+          <option value="Outro">Outra</option>
+          <option value="Não se aplica">Não se aplica</option>
+        </select></div>
+      <div class="form-group"><label>Medicamento tomado</label>
+        <select id="manualMedicine">
+          <option value="Nenhum">Nenhum</option>
+          <option value="Dipirona">Dipirona</option>
+          <option value="Ibuprofeno">Ibuprofeno</option>
+          <option value="Sumatriptano">Sumatriptano</option>
+          <option value="Naratriptano">Naratriptano</option>
+          <option value="Outro">Outro</option>
+        </select></div>
+      <div class="form-group"><label>Houve alívio?</label>
+        <select id="manualRelief">
+          <option value="Sim">Sim</option>
+          <option value="Parcialmente">Parcialmente</option>
+          <option value="Não">Não</option>
+          <option value="Não tomou" selected>Não tomou</option>
+        </select></div>
+      <div class="form-group"><label>Gatilhos (separados por vírgula)</label>
+        <input type="text" id="manualTriggers" placeholder="Ex: Estresse, Jejum, Sono"></div>
+      <div class="form-group"><label>Limitação das atividades</label>
+        <select id="manualLimitation">
+          <option value="Nenhuma">Nenhuma</option>
+          <option value="Leve">Leve</option>
+          <option value="Moderada">Moderada</option>
+          <option value="Grave">Grave</option>
+        </select></div>
+      <div class="form-group"><label>Efeitos adversos</label>
+        <input type="text" id="manualAdverse" placeholder="Ex: sonolência, náusea"></div>
+      <div class="form-group"><label>Observações</label>
+        <textarea id="manualNotes" placeholder="Detalhes adicionais..."></textarea></div>
+      <button type="submit" class="btn btn-primary">💾 Salvar registro</button>
+    </form>
+  </div>
+</div>
+
+<!-- HISTÓRICO -->
+<div id="page-list" class="page">
+  <div class="card">
+    <div class="flex-between" style="margin-bottom:10px;">
+      <h3 style="margin:0;">Histórico</h3>
+      <button class="btn btn-ghost" id="exportCsvBtn" style="width:auto;padding:8px 14px;font-size:13px;">⬇️ Exportar CSV</button>
+    </div>
+    <div id="entryList"><div class="empty-state">Nenhum registro.</div></div>
+  </div>
+  <button class="btn btn-danger" id="clearAllBtn">🗑️ Apagar todos os dados</button>
+</div>
+
+<!-- RESUMO -->
+<div id="page-summary" class="page">
+  <div class="card">
+    <h3>Resumo mensal</h3>
+    <input type="month" id="summaryMonth" style="margin-bottom:12px;">
+    <div id="summaryContent"><div class="empty-state">Selecione um mês.</div></div>
+  </div>
+</div>
+
+<div class="tab-bar">
+  <button class="active" data-tab="home"><span class="ico">🏠</span>Início</button>
+  <button data-tab="voice"><span class="ico">🎙️</span>Assistente</button>
+  <button data-tab="manual"><span class="ico">✏️</span>Manual</button>
+  <button data-tab="list"><span class="ico">📋</span>Histórico</button>
+  <button data-tab="summary"><span class="ico">📊</span>Resumo</button>
+</div>
+
+<script>
+(function(){
+'use strict';
+
+/* ================= TOAST (mensagem rápida) ================= */
+var toastTimer=null;
+function showToast(msg){
+  var t=document.getElementById('toast');
+  t.textContent=msg;
+  t.classList.add('show');
+  if(toastTimer) clearTimeout(toastTimer);
+  toastTimer=setTimeout(function(){ t.classList.remove('show'); }, 2200);
+}
+
+/* ============================================================
+   PWA — manifest gerado em tempo de execução (arquivo único)
+   ============================================================ */
+function makeIconDataURL(size){
+  var c=document.createElement('canvas'); c.width=c.height=size;
+  var x=c.getContext('2d');
+  var g=x.createLinearGradient(0,0,size,size);
+  g.addColorStop(0,'#1d2030'); g.addColorStop(1,'#14161f');
+  x.fillStyle=g; x.fillRect(0,0,size,size);
+  x.strokeStyle='#8fb4ff'; x.lineWidth=size*0.045;
+  x.beginPath(); x.arc(size/2,size/2,size*0.40,0,Math.PI*2); x.stroke();
+  x.font=(size*0.46)+'px serif';
+  x.textAlign='center'; x.textBaseline='middle';
+  x.fillText('🧠', size/2, size/2+size*0.02);
+  return c.toDataURL('image/png');
+}
+(function injectManifest(){
+  try{
+    var startUrl = location.href.split('#')[0];
+    var manifest = {
+      name:'Diário de Enxaqueca',
+      short_name:'Enxaqueca',
+      description:'Registro diário de dores de cabeça e enxaqueca, por voz ou toque.',
+      start_url:startUrl,
+      scope:startUrl,
+      display:'standalone',
+      orientation:'portrait',
+      background_color:'#14161f',
+      theme_color:'#14161f',
+      lang:'pt-BR',
+      icons:[
+        {src:makeIconDataURL(192), sizes:'192x192', type:'image/png', purpose:'any'},
+        {src:makeIconDataURL(512), sizes:'512x512', type:'image/png', purpose:'any'},
+        {src:makeIconDataURL(512), sizes:'512x512', type:'image/png', purpose:'maskable'}
+      ]
+    };
+    var link=document.createElement('link');
+    link.rel='manifest';
+    link.href='data:application/manifest+json,'+encodeURIComponent(JSON.stringify(manifest));
+    document.head.appendChild(link);
+    var touch=document.createElement('link');
+    touch.rel='apple-touch-icon';
+    touch.href=makeIconDataURL(180);
+    document.head.appendChild(touch);
+  }catch(e){}
+})();
+
+/* ---- Service worker (offline) — requer arquivo sw.js ao lado ---- */
+if('serviceWorker' in navigator && location.protocol==='https:'){
+  navigator.serviceWorker.register('./sw.js').catch(function(){});
+}
+
+/* ---- Botão "Instalar app" ---- */
+var deferredInstall=null;
+var isStandalone = window.matchMedia && window.matchMedia('(display-mode: standalone)').matches;
+if(navigator.standalone===true) isStandalone=true;
+
+window.addEventListener('beforeinstallprompt', function(e){
+  e.preventDefault();
+  deferredInstall=e;
+  if(!isStandalone) document.getElementById('installCard').style.display='block';
+});
+window.addEventListener('appinstalled', function(){
+  document.getElementById('installCard').style.display='none';
+  deferredInstall=null;
+  showToast('✅ App instalado!');
+});
+setTimeout(function(){
+  if(!isStandalone && !deferredInstall && location.protocol==='https:'){
+    document.getElementById('installCard').style.display='block';
+    document.getElementById('installManualHint').style.display='block';
+  }
+}, 3000);
+document.getElementById('installBtn').addEventListener('click', function(){
+  if(deferredInstall){
+    deferredInstall.prompt();
+    deferredInstall.userChoice.then(function(){ deferredInstall=null; });
+  } else {
+    document.getElementById('installManualHint').style.display='block';
+  }
+});
+
+/* ---- Botão "Compartilhar" ---- */
+document.getElementById('shareBtn').addEventListener('click', function(){
+  var url = location.href.split('#')[0];
+  var shareData = {
+    title:'Diário de Enxaqueca',
+    text:'Registre suas dores de cabeça e enxaquecas por voz ou toque. Grátis, sem cadastro, dados privados no seu celular:',
+    url:url
+  };
+  if(navigator.share){
+    navigator.share(shareData).catch(function(){ /* usuário cancelou */ });
+  } else if(navigator.clipboard && navigator.clipboard.writeText){
+    navigator.clipboard.writeText(url).then(function(){
+      showToast('🔗 Link copiado! Cole onde quiser.');
+    }).catch(function(){
+      window.prompt('Copie o link do app:', url);
+    });
+  } else {
+    window.prompt('Copie o link do app:', url);
+  }
+});
+
+/* ============================================================
+   ARMAZENAMENTO — localStorage com fallback em memória
+   ============================================================ */
+var store;
+try{
+  localStorage.setItem('__test__','1');
+  localStorage.removeItem('__test__');
+  store=localStorage;
+}catch(e){
+  var mem={};
+  store={
+    getItem:function(k){ return (k in mem)?mem[k]:null; },
+    setItem:function(k,v){ mem[k]=String(v); },
+    removeItem:function(k){ delete mem[k]; }
+  };
+}
+
+/* ================= DADOS ================= */
+function getEntries(){ try{ return JSON.parse(store.getItem('migraine_diary'))||[]; }catch(e){ return []; } }
+function saveEntries(list){ try{ store.setItem('migraine_diary', JSON.stringify(list)); }catch(e){} updateUI(); }
+
+function updateUI(){
+  var entries = getEntries();
+  document.getElementById('totalEntries').textContent = entries.length + (entries.length===1?' registro':' registros');
+  renderLastPreview(); renderList(); renderSummary();
+}
+
+/* ================= UTIL ================= */
+function todayISO(){ var d=new Date(); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); }
+function shiftISO(days){ var d=new Date(); d.setDate(d.getDate()+days); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); }
+function brDate(iso){ var p=iso.split('-'); return p[2]+'/'+p[1]+'/'+p[0]; }
+function esc(s){ return String(s).replace(/[&<>"]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];}); }
+
+/* ============================================================
+   ASSISTENTE DE VOZ — com lógica condicional
+   ============================================================ */
+
+var SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+var recognition = null;
+var session = {
+  active:false, stepIndex:0, data:{}, retries:0,
+  speaking:false, listening:false
+};
+
+var chatLog = document.getElementById('chatLog');
+var chipArea = document.getElementById('chipArea');
+var partialText = document.getElementById('partialText');
+var micOrb = document.getElementById('micOrb');
+var micState = document.getElementById('micState');
+var sessionArea = document.getElementById('sessionArea');
+
+function bubble(cls, text){
+  var d=document.createElement('div');
+  d.className='bubble '+cls; d.textContent=text;
+  chatLog.appendChild(d); chatLog.scrollTop=chatLog.scrollHeight;
+}
+
+/* ---- Fala (TTS) com bloqueio de escuta ---- */
+function speak(text, done){
+  var tts = document.getElementById('ttsToggle').checked;
+  if(!tts || !window.speechSynthesis){ if(done) done(); return; }
+  stopListening();
+  window.speechSynthesis.cancel();
+  session.speaking = true;
+  micOrb.classList.remove('listening'); micOrb.classList.add('speaking');
+  micState.textContent = 'Falando…';
+  var u = new SpeechSynthesisUtterance(text);
+  u.lang='pt-BR'; u.rate=0.95;
+  var finish = function(){
+    session.speaking = false;
+    micOrb.classList.remove('speaking');
+    micState.textContent = 'Toque no microfone para falar, ou escolha uma opção.';
+    setTimeout(function(){ if(done) done(); }, 550);
+  };
+  u.onend = finish;
+  u.onerror = finish;
+  window.speechSynthesis.speak(u);
+}
+function silence(){
+  if(window.speechSynthesis) window.speechSynthesis.cancel();
+  session.speaking=false;
+  micOrb.classList.remove('speaking');
+}
+
+/* ---- Escuta (uma captura por vez, nunca em loop) ---- */
+function setupRecognition(){
+  if(!SR) return;
+  recognition = new SR();
+  recognition.lang='pt-BR';
+  recognition.continuous=false;
+  recognition.interimResults=true;
+  recognition.maxAlternatives=1;
+
+  recognition.onresult=function(ev){
+    if(session.speaking) return;
+    var finalTxt='', interim='';
+    for(var i=ev.resultIndex;i<ev.results.length;i++){
+      if(ev.results[i].isFinal) finalTxt+=ev.results[i][0].transcript;
+      else interim+=ev.results[i][0].transcript;
+    }
+    if(interim) partialText.textContent='🗣️ '+interim;
+    if(finalTxt){
+      partialText.textContent='🗣️ '+finalTxt;
+      stopListening();
+      handleAnswer(finalTxt);
+    }
+  };
+  recognition.onerror=function(ev){
+    session.listening=false;
+    micOrb.classList.remove('listening');
+    if(ev.error==='not-allowed'){
+      micState.textContent='Microfone bloqueado. Permita o acesso no navegador ou responda tocando nas opções.';
+    } else if(ev.error==='no-speech'){
+      micState.textContent='Não ouvi nada. Toque no microfone para tentar de novo, ou toque em uma opção.';
+    } else {
+      micState.textContent='Falha no microfone. Você pode responder tocando nas opções.';
+    }
+  };
+  recognition.onend=function(){
+    session.listening=false;
+    micOrb.classList.remove('listening');
+  };
+}
+
+function startListening(){
+  if(!recognition || !session.active || session.speaking || session.listening) return;
+  try{
+    recognition.start();
+    session.listening=true;
+    micOrb.classList.add('listening');
+    micState.textContent='Ouvindo… fale sua resposta.';
+    partialText.textContent='';
+  }catch(e){}
+}
+function stopListening(){
+  if(recognition && session.listening){ try{recognition.stop();}catch(e){} }
+  session.listening=false;
+  micOrb.classList.remove('listening');
+}
+
+/* ---- Interpretação por limite de palavra ---- */
+function hasWord(text, words){
+  var t=' '+text.toLowerCase()
+    .normalize('NFD').replace(/[\u0300-\u036f]/g,'')+' ';
+  for(var i=0;i<words.length;i++){
+    var w=words[i].normalize('NFD').replace(/[\u0300-\u036f]/g,'');
+    if(new RegExp('\\b'+w+'\\b').test(t)) return true;
+  }
+  return false;
+}
+function parseYesNo(t){
+  var yes=hasWord(t,['sim','tive','teve','isso','correto','confirmo','positivo','claro']);
+  var no=hasWord(t,['nao','nada','negativo','nenhuma','nenhum']);
+  if(yes && !no) return true;
+  if(no && !yes) return false;
+  return null;
+}
+var NUM_WORDS={'zero':0,'um':1,'uma':1,'dois':2,'duas':2,'tres':3,'quatro':4,'cinco':5,'seis':6,'sete':7,'oito':8,'nove':9,'dez':10};
+function parseIntensity(t){
+  var norm=t.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
+  var m=norm.match(/\b(10|[0-9])\b/);
+  if(m) return parseInt(m[1],10);
+  for(var w in NUM_WORDS){ if(new RegExp('\\b'+w+'\\b').test(norm)) return NUM_WORDS[w]; }
+  return null;
+}
+function parseOption(t, map){
+  for(var key in map){ if(hasWord(t,[key])) return map[key]; }
+  return null;
+}
+
+/* ---- Helpers de lógica condicional ---- */
+function noSymptoms(){ return !session.data.hadPain && !session.data.hadMigraine; }
+function askText(step){ return (typeof step.ask==='function')?step.ask():step.ask; }
+
+/* ---- Definição dos passos ---- */
+var STEPS=[
+  {
+    id:'date', ask:'Qual a data do registro? Diga hoje ou ontem, ou toque em uma opção.',
+    chips:[{l:'Hoje',v:todayISO},{l:'Ontem',v:function(){return shiftISO(-1);}},{l:'Anteontem',v:function(){return shiftISO(-2);}}],
+    parse:function(t){
+      if(hasWord(t,['hoje','sim'])) return todayISO();
+      if(hasWord(t,['ontem'])) return shiftISO(-1);
+      if(hasWord(t,['anteontem'])) return shiftISO(-2);
+      var m=t.match(/(\d{1,2})[\/\s.](\d{1,2})(?:[\/\s.](\d{4}))?/);
+      if(m){
+        var d=+m[1], mo=+m[2], y=m[3]?+m[3]:new Date().getFullYear();
+        if(d>=1&&d<=31&&mo>=1&&mo<=12) return y+'-'+String(mo).padStart(2,'0')+'-'+String(d).padStart(2,'0');
+      }
+      return null;
+    },
+    apply:function(v){session.data.date=v;}, show:function(v){return brDate(v);}
+  },
+  {
+    id:'pain', ask:'Teve dor de cabeça? Sim ou não.',
+    chips:[{l:'Sim',v:true},{l:'Não',v:false}],
+    parse:parseYesNo,
+    apply:function(v){session.data.hadPain=v;}, show:function(v){return v?'Sim':'Não';}
+  },
+  {
+    id:'migraine',
+    ask:function(){
+      return session.data.hadPain
+        ? 'Foi enxaqueca? Sim ou não.'
+        : 'Mesmo sem dor, teve sinais de enxaqueca, como aura, enjoo ou sensibilidade à luz? Sim ou não.';
+    },
+    chips:[{l:'Sim',v:true},{l:'Não',v:false}],
+    parse:parseYesNo,
+    apply:function(v){session.data.hadMigraine=v;}, show:function(v){return v?'Sim':'Não';}
+  },
+  {
+    id:'intensity', ask:'De zero a dez, qual foi a intensidade da dor?',
+    skipIf:function(){return !session.data.hadPain;},
+    skipValue:function(){return 0;},
+    chips:[0,1,2,3,4,5,6,7,8,9,10].map(function(n){return {l:String(n),v:n};}), grid:true,
+    parse:parseIntensity,
+    apply:function(v){session.data.intensity=v;}, show:function(v){return v+'/10';}
+  },
+  {
+    id:'duration',
+    ask:function(){
+      return session.data.hadPain
+        ? 'Quanto tempo durou a dor? Menos de uma hora, até quatro horas, até doze horas, até um dia, ou mais de um dia.'
+        : 'Quanto tempo duraram os sintomas? Menos de uma hora, até quatro horas, até doze horas, até um dia, ou mais de um dia.';
+    },
+    skipIf:noSymptoms,
+    skipValue:function(){return 'Não se aplica';},
+    chips:[{l:'< 1h',v:'< 1h'},{l:'1–4h',v:'1-4h'},{l:'4–12h',v:'4-12h'},{l:'12–24h',v:'12-24h'},{l:'> 24h',v:'> 24h'}],
+    parse:function(t){
+      var n=parseIntensity(t);
+      if(hasWord(t,['menos'])) return '< 1h';
+      if(hasWord(t,['mais'])||hasWord(t,['dias'])) return '> 24h';
+      if(n!==null){ if(n<1)return '< 1h'; if(n<=4)return '1-4h'; if(n<=12)return '4-12h'; if(n<=24)return '12-24h'; return '> 24h'; }
+      if(hasWord(t,['dia'])) return '12-24h';
+      return null;
+    },
+    apply:function(v){session.data.duration=v;}, show:function(v){return v;}
+  },
+  {
+    id:'location', ask:'Onde doeu? Testa, laterais, nuca, olhos, pescoço ou a cabeça toda.',
+    skipIf:function(){return !session.data.hadPain;},
+    skipValue:function(){return 'Não se aplica';},
+    chips:[{l:'Testa',v:'Frontal'},{l:'Laterais',v:'Temporal'},{l:'Nuca',v:'Occipital'},{l:'Olhos',v:'Olhos'},{l:'Pescoço',v:'Cervical'},{l:'Cabeça toda',v:'Generalizada'}],
+    parse:function(t){return parseOption(t,{'testa':'Frontal','frontal':'Frontal','frente':'Frontal','lateral':'Temporal','laterais':'Temporal','temporal':'Temporal','lado':'Temporal','nuca':'Occipital','occipital':'Occipital','olho':'Olhos','olhos':'Olhos','pescoco':'Cervical','cervical':'Cervical','toda':'Generalizada','generalizada':'Generalizada','inteira':'Generalizada'});},
+    apply:function(v){session.data.location=v;}, show:function(v){return v;}
+  },
+  {
+    id:'medicine', ask:'Tomou algum remédio? Nenhum, dipirona, ibuprofeno, sumatriptano, naratriptano ou outro.',
+    skipIf:noSymptoms,
+    skipValue:function(){return 'Nenhum';},
+    chips:[{l:'Nenhum',v:'Nenhum'},{l:'Dipirona',v:'Dipirona'},{l:'Ibuprofeno',v:'Ibuprofeno'},{l:'Sumatriptano',v:'Sumatriptano'},{l:'Naratriptano',v:'Naratriptano'},{l:'Outro',v:'Outro'}],
+    parse:function(t){return parseOption(t,{'nenhum':'Nenhum','nada':'Nenhum','dipirona':'Dipirona','ibuprofeno':'Ibuprofeno','sumatriptano':'Sumatriptano','naratriptano':'Naratriptano','outro':'Outro'});},
+    apply:function(v){session.data.medicine=v;}, show:function(v){return v;}
+  },
+  {
+    id:'relief', ask:'Houve alívio? Sim, parcialmente ou não.',
+    skipIf:function(){return noSymptoms() || session.data.medicine==='Nenhum';},
+    skipValue:function(){return 'Não tomou';},
+    chips:[{l:'Sim',v:'Sim'},{l:'Parcialmente',v:'Parcialmente'},{l:'Não',v:'Não'}],
+    parse:function(t){
+      if(hasWord(t,['parcial','parcialmente','pouco','mais ou menos'])) return 'Parcialmente';
+      var yn=parseYesNo(t);
+      if(yn===true) return 'Sim'; if(yn===false) return 'Não';
+      return null;
+    },
+    apply:function(v){session.data.relief=v;}, show:function(v){return v;}
+  },
+  {
+    id:'triggers', ask:'Algum gatilho? Estresse, jejum, sono, menstruação, cafeína, álcool, alimentos, luz, clima, exercício — ou nenhum.',
+    skipIf:noSymptoms,
+    skipValue:function(){return [];},
+    chips:[{l:'Estresse',v:'Estresse'},{l:'Jejum',v:'Jejum'},{l:'Sono',v:'Sono'},{l:'Menstruação',v:'Menstruação'},{l:'Cafeína',v:'Cafeína'},{l:'Álcool',v:'Álcool'},{l:'Alimentos',v:'Alimentos'},{l:'Luz/Odores',v:'Luzes/Odores'},{l:'Clima',v:'Clima'},{l:'Exercício',v:'Exercício'},{l:'Nenhum',v:'__none'}],
+    multi:true,
+    parse:function(t){
+      var list=[];
+      var map={'estresse':'Estresse','jejum':'Jejum','sono':'Sono','menstruacao':'Menstruação','cafeina':'Cafeína','cafe':'Cafeína','alcool':'Álcool','alimento':'Alimentos','alimentos':'Alimentos','queijo':'Alimentos','chocolate':'Alimentos','luz':'Luzes/Odores','luzes':'Luzes/Odores','cheiro':'Luzes/Odores','odores':'Luzes/Odores','clima':'Clima','calor':'Clima','exercicio':'Exercício'};
+      for(var k in map){ if(hasWord(t,[k]) && list.indexOf(map[k])===-1) list.push(map[k]); }
+      if(list.length) return list;
+      if(hasWord(t,['nenhum','nao','nada'])) return [];
+      return null;
+    },
+    apply:function(v){session.data.triggers=v;},
+    show:function(v){return v.length?v.join(', '):'Nenhum';}
+  },
+  {
+    id:'limitation',
+    ask:function(){
+      return session.data.hadPain
+        ? 'A dor limitou suas atividades? Nenhuma limitação, leve, moderada ou grave.'
+        : 'Os sintomas limitaram suas atividades? Nenhuma limitação, leve, moderada ou grave.';
+    },
+    skipIf:noSymptoms,
+    skipValue:function(){return 'Nenhuma';},
+    chips:[{l:'Nenhuma',v:'Nenhuma'},{l:'Leve',v:'Leve'},{l:'Moderada',v:'Moderada'},{l:'Grave',v:'Grave'}],
+    parse:function(t){
+      var v=parseOption(t,{'grave':'Grave','moderada':'Moderada','moderado':'Moderada','leve':'Leve','nenhuma':'Nenhuma','nenhum':'Nenhuma'});
+      if(v) return v;
+      if(parseYesNo(t)===false) return 'Nenhuma';
+      return null;
+    },
+    apply:function(v){session.data.limitation=v;}, show:function(v){return v;}
+  }
+];
+
+/* ---- Fluxo ---- */
+function currentStep(){ return STEPS[session.stepIndex]; }
+
+function renderChips(step){
+  chipArea.innerHTML='';
+  chipArea.className='chips'+(step.grid?' grid10':'');
+  var selected=[];
+  step.chips.forEach(function(c){
+    var b=document.createElement('button');
+    b.type='button'; b.className='chip'; b.textContent=c.l;
+    b.addEventListener('click',function(){
+      var val=(typeof c.v==='function')?c.v():c.v;
+      if(step.multi){
+        if(val==='__none'){ acceptAnswer([]); return; }
+        var i=selected.indexOf(val);
+        if(i>=0){ selected.splice(i,1); b.classList.remove('sel'); }
+        else{ selected.push(val); b.classList.add('sel'); }
+        ensureDoneChip();
+      } else {
+        acceptAnswer(val);
+      }
+    });
+    chipArea.appendChild(b);
+  });
+  function ensureDoneChip(){
+    if(document.getElementById('doneChip')) return;
+    var d=document.createElement('button');
+    d.type='button'; d.className='chip'; d.id='doneChip';
+    d.style.background='var(--accent)'; d.style.color='#10131f';
+    d.textContent='Concluir ✓';
+    d.addEventListener('click',function(){ acceptAnswer(selected.slice()); });
+    chipArea.appendChild(d);
+  }
+}
+
+function askStep(){
+  if(!session.active) return;
+  var step=currentStep();
+  if(!step){ finishSession(); return; }
+  if(step.skipIf && step.skipIf()){
+    step.apply(step.skipValue());
+    session.stepIndex++;
+    askStep(); return;
+  }
+  session.retries=0;
+  var txt=askText(step);
+  bubble('q','('+(session.stepIndex+1)+'/'+STEPS.length+') '+txt);
+  renderChips(step);
+  speak(txt, function(){
+    if(document.getElementById('autoListenToggle').checked) startListening();
+  });
+}
+
+function acceptAnswer(value){
+  if(!session.active) return;
+  var step=currentStep();
+  stopListening();
+  silence();
+  step.apply(value);
+  bubble('a', step.show(value));
+  partialText.textContent='';
+  session.stepIndex++;
+  if(session.stepIndex>=STEPS.length){ finishSession(); }
+  else askStep();
+}
+
+function handleAnswer(transcript){
+  if(!session.active) return;
+  var t=transcript.toLowerCase();
+  if(hasWord(t,['cancelar','parar','sair'])){ cancelSession(); return; }
+  if(hasWord(t,['voltar','anterior'])){ goBack(); return; }
+  if(hasWord(t,['repetir','repete'])){ askStep2Repeat(); return; }
+  var step=currentStep();
+  var value=step.parse(transcript);
+  if(value===null || value===undefined){
+    session.retries++;
+    bubble('sys','Não entendi: "'+transcript+'"');
+    if(session.retries>=2){
+      speak('Não consegui entender. Toque em uma das opções na tela.', null);
+    } else {
+      speak('Não entendi. '+askText(step), function(){
+        if(document.getElementById('autoListenToggle').checked) startListening();
+      });
+    }
+    return;
+  }
+  acceptAnswer(value);
+}
+
+function askStep2Repeat(){
+  if(!session.active) return;
+  var step=currentStep();
+  speak(askText(step), function(){
+    if(document.getElementById('autoListenToggle').checked) startListening();
+  });
+}
+
+/* ---- Voltar: com feedback e proteção ---- */
+function goBack(){
+  if(!session.active){ showToast('Nenhuma sessão ativa.'); return; }
+  if(session.stepIndex===0){ showToast('↩️ Você já está na primeira pergunta.'); return; }
+  stopListening();
+  silence();
+  session.stepIndex--;
+  while(session.stepIndex>0 && STEPS[session.stepIndex].skipIf && STEPS[session.stepIndex].skipIf()){
+    session.stepIndex--;
+  }
+  showToast('↩️ Voltando uma pergunta…');
+  askStep();
+}
+
+function finishSession(){
+  var d=session.data;
+  var entries=getEntries();
+  entries.push({
+    id:Date.now(),
+    date:d.date||todayISO(),
+    hadPain:!!d.hadPain,
+    hadMigraine:!!d.hadMigraine,
+    intensity:(typeof d.intensity==='number')?d.intensity:0,
+    duration:d.duration||'Não informado',
+    location:d.location||'Não informado',
+    medicine:d.medicine||'Nenhum',
+    relief:d.relief||'Não tomou',
+    limitation:d.limitation||'Nenhuma',
+    adverse:'', notes:'',
+    triggers:d.triggers||[],
+    createdAt:new Date().toISOString()
+  });
+  saveEntries(entries);
+  chipArea.innerHTML='';
+  if(!d.hadPain && !d.hadMigraine){
+    bubble('ok','✅ Dia sem sintomas registrado!');
+    speak('Dia sem sintomas registrado. Ótima notícia.', null);
+  } else {
+    bubble('ok','✅ Registro salvo!');
+    speak('Registro salvo com sucesso.', null);
+  }
+  session.active=false;
+  document.getElementById('startSessionBtn').style.display='block';
+  document.getElementById('startSessionBtn').textContent='🎙️ Registrar outro dia';
+  micState.textContent='Sessão concluída.';
+}
+
+/* ---- Cancelar: só com sessão ativa, fecha e limpa tudo ---- */
+function cancelSession(){
+  if(!session.active){ showToast('Nenhuma sessão em andamento.'); return; }
+  stopListening();
+  silence();
+  session.active=false;
+  chatLog.innerHTML='';
+  chipArea.innerHTML='';
+  partialText.textContent='';
+  sessionArea.style.display='none';
+  document.getElementById('startSessionBtn').style.display='block';
+  showToast('❌ Sessão cancelada — nada foi salvo.');
+}
+
+function startSession(){
+  if(session.active) return;
+  session.active=true; session.stepIndex=0; session.data={}; session.retries=0;
+  chatLog.innerHTML=''; chipArea.innerHTML=''; partialText.textContent='';
+  sessionArea.style.display='block';
+  document.getElementById('startSessionBtn').style.display='none';
+  micState.textContent='Toque no microfone para falar, ou escolha uma opção.';
+
+  if(!recognition && SR) setupRecognition();
+  if(!SR){
+    document.getElementById('voiceHint').textContent='Seu navegador não suporta voz — sem problema: responda tocando nas opções.';
+    micOrb.style.display='none';
+    askStep();
+    return;
+  }
+  if(navigator.mediaDevices && navigator.mediaDevices.getUserMedia){
+    navigator.mediaDevices.getUserMedia({audio:true}).then(function(stream){
+      stream.getTracks().forEach(function(tr){tr.stop();});
+      askStep();
+    }).catch(function(){
+      micState.textContent='Sem microfone — responda tocando nas opções.';
+      askStep();
+    });
+  } else { askStep(); }
+}
+
+document.getElementById('startSessionBtn').addEventListener('click', startSession);
+document.getElementById('quickStartBtn').addEventListener('click', function(){
+  switchTab('voice'); startSession();
+});
+document.getElementById('cancelSessionBtn').addEventListener('click', cancelSession);
+document.getElementById('backStepBtn').addEventListener('click', goBack);
+micOrb.addEventListener('click', function(){
+  if(!session.active) return;
+  if(session.listening){ stopListening(); micState.textContent='Escuta pausada.'; }
+  else if(!session.speaking){ startListening(); }
+});
+
+/* ================= LEMBRETE ================= */
+function scheduleReminder(){
+  var t=document.getElementById('reminderTime').value;
+  if(!t){ showToast('Selecione um horário.'); return; }
+  store.setItem('reminder_time',t);
+  document.getElementById('reminderStatus').textContent='✅ Lembrete ativo para '+t+' (todos os dias).';
+  showToast('⏰ Lembrete ativado para '+t);
+  if('Notification' in window && Notification.permission==='default'){
+    Notification.requestPermission();
+  }
+}
+function clearReminder(){
+  store.removeItem('reminder_time');
+  document.getElementById('reminderStatus').textContent='Lembrete desativado.';
+  showToast('Lembrete desativado.');
+}
+(function initReminder(){
+  var saved=store.getItem('reminder_time');
+  if(saved){
+    document.getElementById('reminderTime').value=saved;
+    document.getElementById('reminderStatus').textContent='✅ Lembrete ativo para '+saved;
+  }
+})();
+document.getElementById('setReminderBtn').addEventListener('click', scheduleReminder);
+document.getElementById('clearReminderBtn').addEventListener('click', clearReminder);
+var lastNotifiedMinute=null;
+setInterval(function(){
+  var rt=store.getItem('reminder_time'); if(!rt) return;
+  var now=new Date();
+  var hm=String(now.getHours()).padStart(2,'0')+':'+String(now.getMinutes()).padStart(2,'0');
+  if(hm===rt && lastNotifiedMinute!==hm){
+    lastNotifiedMinute=hm;
+    if('Notification' in window && Notification.permission==='granted'){
+      new Notification('Hora do Diário de Enxaqueca', {body:'Registre como foi o seu dia.'});
+    }
+  }
+  if(hm!==rt) lastNotifiedMinute=null;
+},15000);
+
+/* ================= FORMULÁRIO MANUAL ================= */
+function syncManualLogic(){
+  var pain=document.getElementById('manualPain').checked;
+  var mig=document.getElementById('manualMigraine').checked;
+  var none=!pain && !mig;
+  var intensity=document.getElementById('manualIntensity');
+  var loc=document.getElementById('manualLocation');
+  var dur=document.getElementById('manualDuration');
+  var med=document.getElementById('manualMedicine');
+  var rel=document.getElementById('manualRelief');
+  var trig=document.getElementById('manualTriggers');
+  var lim=document.getElementById('manualLimitation');
+
+  intensity.disabled=!pain;
+  loc.disabled=!pain;
+  if(!pain){
+    intensity.value=0;
+    document.getElementById('manualIntensityDisplay').textContent='0';
+    loc.value='Não se aplica';
+  }
+  dur.disabled=none; med.disabled=none; trig.disabled=none; lim.disabled=none;
+  if(none){
+    dur.value='Não se aplica'; med.value='Nenhum'; trig.value=''; lim.value='Nenhuma';
+  }
+  rel.disabled=none || med.value==='Nenhum';
+  if(rel.disabled) rel.value='Não tomou';
+}
+document.getElementById('manualPain').addEventListener('change', syncManualLogic);
+document.getElementById('manualMigraine').addEventListener('change', syncManualLogic);
+document.getElementById('manualMedicine').addEventListener('change', syncManualLogic);
+
+document.getElementById('manualDate').value=todayISO();
+document.getElementById('manualIntensity').addEventListener('input',function(){
+  document.getElementById('manualIntensityDisplay').textContent=this.value;
+});
+document.getElementById('manualForm').addEventListener('submit',function(e){
+  e.preventDefault();
+  var trigRaw=document.getElementById('manualTriggers').value.trim();
+  var entries=getEntries();
+  entries.push({
+    id:Date.now(),
+    date:document.getElementById('manualDate').value,
+    hadPain:document.getElementById('manualPain').checked,
+    hadMigraine:document.getElementById('manualMigraine').checked,
+    intensity:parseInt(document.getElementById('manualIntensity').value,10),
+    duration:document.getElementById('manualDuration').value,
+    location:document.getElementById('manualLocation').value,
+    medicine:document.getElementById('manualMedicine').value,
+    relief:document.getElementById('manualRelief').value,
+    limitation:document.getElementById('manualLimitation').value,
+    adverse:document.getElementById('manualAdverse').value.trim(),
+    notes:document.getElementById('manualNotes').value.trim(),
+    triggers:trigRaw?trigRaw.split(',').map(function(s){return s.trim();}).filter(Boolean):[],
+    createdAt:new Date().toISOString()
+  });
+  saveEntries(entries);
+  showToast('💾 Registro salvo!');
+  this.reset();
+  document.getElementById('manualDate').value=todayISO();
+  document.getElementById('manualPain').checked=true;
+  document.getElementById('manualIntensityDisplay').textContent='5';
+  syncManualLogic();
+  switchTab('list');
+});
+
+/* ================= RENDER ================= */
+function renderLastPreview(){
+  var entries=getEntries();
+  var c=document.getElementById('lastEntryPreview');
+  if(!entries.length){ c.innerHTML='<div class="empty-state">Nenhum registro ainda.</div>'; return; }
+  var l=entries[entries.length-1];
+  if(!l.hadPain && !l.hadMigraine){
+    c.innerHTML='<div class="list-item"><div class="date">📅 '+esc(brDate(l.date))+'</div>'+
+      '<div class="tags"><span style="color:var(--ok);">✨ Dia sem sintomas</span></div></div>';
+    return;
+  }
+  c.innerHTML='<div class="list-item"><div class="date">📅 '+esc(brDate(l.date))+'</div>'+
+    '<div class="tags"><span>💥 '+esc(l.intensity)+'/10</span><span>📍 '+esc(l.location)+'</span>'+
+    '<span>💊 '+esc(l.medicine)+'</span><span>🔄 '+esc(l.relief)+'</span></div></div>';
+}
+
+function renderList(){
+  var entries=getEntries();
+  var c=document.getElementById('entryList');
+  if(!entries.length){ c.innerHTML='<div class="empty-state">Nenhum registro. Comece pelo Assistente ou pelo Manual.</div>'; return; }
+  var html='';
+  entries.slice().reverse().forEach(function(e2){
+    var noSym=!e2.hadPain && !e2.hadMigraine;
+    html+='<div class="list-item"><div class="flex-between">'+
+      '<span class="date">📅 '+esc(brDate(e2.date))+'</span>'+
+      '<span class="pill'+(e2.hadPain?' pain':'')+'">'+(e2.hadPain?'Dor':(e2.hadMigraine?'Enxaqueca s/ dor':'Sem sintomas'))+'</span></div>';
+    if(noSym){
+      html+='<div class="tags"><span style="color:var(--ok);">✨ Dia sem dor e sem enxaqueca</span></div>';
+    } else {
+      html+='<div class="tags">'+
+        (e2.hadPain?'<span>💥 '+esc(e2.intensity)+'/10</span>':'')+
+        '<span>⏱️ '+esc(e2.duration||'—')+'</span>'+
+        (e2.hadPain?'<span>📍 '+esc(e2.location)+'</span>':'')+
+        '<span>💊 '+esc(e2.medicine)+'</span><span>🔄 '+esc(e2.relief)+'</span>'+
+        (e2.triggers&&e2.triggers.length?'<span>🔹 '+esc(e2.triggers.slice(0,3).join(', '))+'</span>':'')+
+        '</div>';
+    }
+    html+='<button class="del-btn" onclick="window.deleteEntry('+e2.id+')">Excluir</button></div>';
+  });
+  c.innerHTML=html;
+}
+
+window.deleteEntry=function(id){
+  if(!confirm('Remover este registro?')) return;
+  saveEntries(getEntries().filter(function(e){return e.id!==id;}));
+  showToast('🗑️ Registro removido.');
+};
+
+function renderSummary(){
+  var mv=document.getElementById('summaryMonth').value;
+  var c=document.getElementById('summaryContent');
+  if(!mv){ c.innerHTML='<div class="empty-state">Selecione um mês.</div>'; return; }
+  var parts=mv.split('-'), year=+parts[0], month=+parts[1];
+  var filtered=getEntries().filter(function(e){
+    var p=e.date.split('-'); return +p[0]===year && +p[1]===month;
+  });
+  if(!filtered.length){ c.innerHTML='<div class="empty-state">Nenhum registro neste mês.</div>'; return; }
+  var total=filtered.length;
+  var painDays=filtered.filter(function(e){return e.hadPain;}).length;
+  var migDays=filtered.filter(function(e){return e.hadMigraine;}).length;
+  var freeDays=filtered.filter(function(e){return !e.hadPain && !e.hadMigraine;}).length;
+  var intense=filtered.filter(function(e){return e.intensity>=7;}).length;
+  var medDays=filtered.filter(function(e){return e.medicine&&e.medicine!=='Nenhum';}).length;
+  var painEntries=filtered.filter(function(e){return e.hadPain;});
+  var avg=painEntries.length?(painEntries.reduce(function(a,e){return a+(e.intensity||0);},0)/painEntries.length).toFixed(1):'—';
+  var daysInMonth=new Date(year,month,0).getDate();
+  var byDay={};
+  filtered.forEach(function(e){
+    var d=+e.date.split('-')[2];
+    byDay[d]=Math.max(byDay[d]||0, e.intensity||0);
+  });
+  var chart='<div class="chart-container">';
+  for(var d=1;d<=daysInMonth;d++){
+    var v=byDay[d]||0;
+    var h=v===0?2:Math.round(v/10*100);
+    var col=v===0?'var(--line)':(v>=7?'var(--danger)':'var(--accent)');
+    chart+='<div class="bar-wrapper"><div class="bar" style="height:'+h+'px;background:'+col+';"></div><div class="bar-label">'+d+'</div></div>';
+  }
+  chart+='</div><p class="hint" style="margin-top:8px;">Altura da barra = intensidade máxima registrada no dia (vermelho: ≥ 7).</p>';
+  c.innerHTML='<div class="stats-grid">'+
+    '<div class="stat-item"><div class="number">'+total+'</div><div class="label">Registros</div></div>'+
+    '<div class="stat-item"><div class="number">'+painDays+'</div><div class="label">Dias c/ dor</div></div>'+
+    '<div class="stat-item"><div class="number">'+migDays+'</div><div class="label">Enxaqueca</div></div>'+
+    '<div class="stat-item"><div class="number" style="color:var(--ok);">'+freeDays+'</div><div class="label">Sem sintomas</div></div>'+
+    '<div class="stat-item"><div class="number">'+intense+'</div><div class="label">Intensas (≥7)</div></div>'+
+    '<div class="stat-item"><div class="number">'+medDays+'</div><div class="label">C/ medicação</div></div>'+
+    '<div class="stat-item"><div class="number">'+avg+'</div><div class="label">Média (dias c/ dor)</div></div>'+
+    '</div>'+chart;
+}
+
+/* ================= EXPORT CSV ================= */
+document.getElementById('exportCsvBtn').addEventListener('click',function(){
+  var entries=getEntries();
+  if(!entries.length){ showToast('Nenhum registro para exportar.'); return; }
+  function q(v){ return '"'+String(v==null?'':v).replace(/"/g,'""')+'"'; }
+  var rows=[['Data','Dor','Enxaqueca','Intensidade','Duração','Localização','Medicamento','Alívio','Limitação','Gatilhos','Efeitos adversos','Observações'].join(';')];
+  entries.forEach(function(e){
+    rows.push([brDate(e.date), e.hadPain?'Sim':'Não', e.hadMigraine?'Sim':'Não', e.intensity,
+      e.duration||'', e.location||'', e.medicine||'', e.relief||'', e.limitation||'',
+      (e.triggers||[]).join(', '), e.adverse||'', e.notes||''].map(q).join(';'));
+  });
+  var blob=new Blob(['\uFEFF'+rows.join('\r\n')],{type:'text/csv;charset=utf-8'});
+  var a=document.createElement('a');
+  a.href=URL.createObjectURL(blob);
+  a.download='diario-enxaqueca.csv';
+  document.body.appendChild(a); a.click();
+  setTimeout(function(){ URL.revokeObjectURL(a.href); a.remove(); },500);
+  showToast('⬇️ CSV exportado!');
+});
+
+/* ================= TABS / CLEAR / INIT ================= */
+function switchTab(tabId){
+  document.querySelectorAll('.page').forEach(function(p){p.classList.remove('active');});
+  document.querySelectorAll('.tab-bar button').forEach(function(b){b.classList.remove('active');});
+  document.getElementById('page-'+tabId).classList.add('active');
+  document.querySelector('.tab-bar button[data-tab="'+tabId+'"]').classList.add('active');
+  if(tabId==='list') renderList();
+  if(tabId==='summary') renderSummary();
+  if(tabId==='home') renderLastPreview();
+}
+document.querySelectorAll('.tab-bar button').forEach(function(btn){
+  btn.addEventListener('click',function(){ switchTab(this.dataset.tab); });
+});
+
+document.getElementById('clearAllBtn').addEventListener('click',function(){
+  if(!confirm('Apagar TODOS os registros? Esta ação não pode ser desfeita.')) return;
+  store.removeItem('migraine_diary');
+  updateUI();
+  showToast('🗑️ Todos os dados foram apagados.');
+});
+
+document.getElementById('summaryMonth').addEventListener('change', renderSummary);
+
+document.getElementById('summaryMonth').value=todayISO().substring(0,7);
+updateUI();
+})();
+</script>
+</body>
+</html>

@@ -177,7 +177,7 @@ input[type=range]{width:100%;accent-color:var(--accent);}
 <div id="page-voice" class="page">
   <div class="card">
     <h3>Registro guiado</h3>
-    <p class="hint" id="voiceHint">Responda por voz ou toque nas opções. O microfone só escuta depois que a pergunta termina — e nunca preenche nada sem entender sua resposta.</p>
+    <p class="hint" id="voiceHint">Responda por voz ou toque nas opções. As perguntas se adaptam às suas respostas: dias sem sintomas terminam em segundos.</p>
 
     <button class="btn btn-primary" id="startSessionBtn">🎙️ Começar</button>
 
@@ -229,6 +229,7 @@ input[type=range]{width:100%;accent-color:var(--accent);}
           <option value="4-12h">4 a 12 horas</option>
           <option value="12-24h">12 a 24 horas</option>
           <option value="> 24h">Mais de 24 horas</option>
+          <option value="Não se aplica">Não se aplica</option>
         </select></div>
       <div class="form-group"><label>Localização</label>
         <select id="manualLocation">
@@ -239,6 +240,7 @@ input[type=range]{width:100%;accent-color:var(--accent);}
           <option value="Cervical">Cervical (pescoço)</option>
           <option value="Generalizada">Generalizada</option>
           <option value="Outro">Outra</option>
+          <option value="Não se aplica">Não se aplica</option>
         </select></div>
       <div class="form-group"><label>Medicamento tomado</label>
         <select id="manualMedicine">
@@ -309,20 +311,15 @@ input[type=range]{width:100%;accent-color:var(--accent);}
 
 /* ============================================================
    PWA — manifest gerado em tempo de execução (arquivo único)
-   Ícones desenhados em canvas → PNG data-URI → manifest data-URI.
-   Requer HTTPS (link publicado) para o Chrome oferecer instalação.
    ============================================================ */
 function makeIconDataURL(size){
   var c=document.createElement('canvas'); c.width=c.height=size;
   var x=c.getContext('2d');
-  // fundo com leve gradiente
   var g=x.createLinearGradient(0,0,size,size);
   g.addColorStop(0,'#1d2030'); g.addColorStop(1,'#14161f');
   x.fillStyle=g; x.fillRect(0,0,size,size);
-  // anel de destaque
   x.strokeStyle='#8fb4ff'; x.lineWidth=size*0.045;
   x.beginPath(); x.arc(size/2,size/2,size*0.40,0,Math.PI*2); x.stroke();
-  // emoji central
   x.font=(size*0.46)+'px serif';
   x.textAlign='center'; x.textBaseline='middle';
   x.fillText('🧠', size/2, size/2+size*0.02);
@@ -352,7 +349,6 @@ function makeIconDataURL(size){
     link.rel='manifest';
     link.href='data:application/manifest+json,'+encodeURIComponent(JSON.stringify(manifest));
     document.head.appendChild(link);
-    // ícone para favoritos/atalho (fallback iOS/atalho simples)
     var touch=document.createElement('link');
     touch.rel='apple-touch-icon';
     touch.href=makeIconDataURL(180);
@@ -379,8 +375,6 @@ window.addEventListener('appinstalled', function(){
   document.getElementById('installCard').style.display='none';
   deferredInstall=null;
 });
-// Se o Chrome não disparar o evento (ex.: já elegível mas sem prompt),
-// ainda mostra o card com instrução manual após alguns segundos.
 setTimeout(function(){
   if(!isStandalone && !deferredInstall && location.protocol==='https:'){
     document.getElementById('installCard').style.display='block';
@@ -397,9 +391,7 @@ document.getElementById('installBtn').addEventListener('click', function(){
 });
 
 /* ============================================================
-   ARMAZENAMENTO — usa localStorage quando disponível (no app
-   instalado / Chrome), com fallback em memória caso o ambiente
-   bloqueie (ex.: pré-visualização).
+   ARMAZENAMENTO — localStorage com fallback em memória
    ============================================================ */
 var store;
 try{
@@ -433,14 +425,11 @@ function esc(s){ return String(s).replace(/[&<>"]/g,function(c){return {'&':'&am
 
 /* ============================================================
    ASSISTENTE DE VOZ
-   Regras:
-   1. Nunca escuta enquanto fala (flag "speaking" + descarte de
-      resultados recebidos durante a fala) → sem eco.
-   2. Só aceita resposta que case com palavras-chave por LIMITE DE
-      PALAVRA (\b). "estresse" nunca mais vira "sim".
-   3. Resposta não entendida → repete a pergunta. NUNCA usa valor
-      padrão nem avança sozinho.
-   4. Toda pergunta tem opções tocáveis — funciona 100% sem voz.
+   Lógica condicional:
+   - Sem dor → reformula a pergunta de enxaqueca (aura sem dor
+     existe) e pula intensidade e localização.
+   - Sem dor E sem enxaqueca → pula duração, remédio, alívio,
+     gatilhos e limitação. Registro "dia sem sintomas" em 3 perguntas.
    ============================================================ */
 
 var SR = window.SpeechRecognition || window.webkitSpeechRecognition;
@@ -477,7 +466,6 @@ function speak(text, done){
     session.speaking = false;
     micOrb.classList.remove('speaking');
     micState.textContent = 'Toque no microfone para falar, ou escolha uma opção.';
-    // pequena espera para o eco morrer antes de liberar o microfone
     setTimeout(function(){ if(done) done(); }, 550);
   };
   u.onend = finish;
@@ -495,7 +483,7 @@ function setupRecognition(){
   recognition.maxAlternatives=1;
 
   recognition.onresult=function(ev){
-    if(session.speaking) return;            // descarta eco da própria fala
+    if(session.speaking) return;
     var finalTxt='', interim='';
     for(var i=ev.resultIndex;i<ev.results.length;i++){
       if(ev.results[i].isFinal) finalTxt+=ev.results[i][0].transcript;
@@ -522,7 +510,6 @@ function setupRecognition(){
   recognition.onend=function(){
     session.listening=false;
     micOrb.classList.remove('listening');
-    // NÃO reinicia sozinho — evita o loop que capturava a fala do app.
   };
 }
 
@@ -572,6 +559,10 @@ function parseOption(t, map){
   return null;
 }
 
+/* ---- Helpers de lógica condicional ---- */
+function noSymptoms(){ return !session.data.hadPain && !session.data.hadMigraine; }
+function askText(step){ return (typeof step.ask==='function')?step.ask():step.ask; }
+
 /* ---- Definição dos passos ---- */
 var STEPS=[
   {
@@ -597,19 +588,33 @@ var STEPS=[
     apply:function(v){session.data.hadPain=v;}, show:function(v){return v?'Sim':'Não';}
   },
   {
-    id:'migraine', ask:'Foi enxaqueca? Sim ou não.',
+    id:'migraine',
+    ask:function(){
+      return session.data.hadPain
+        ? 'Foi enxaqueca? Sim ou não.'
+        : 'Mesmo sem dor, teve sinais de enxaqueca, como aura, enjoo ou sensibilidade à luz? Sim ou não.';
+    },
     chips:[{l:'Sim',v:true},{l:'Não',v:false}],
     parse:parseYesNo,
     apply:function(v){session.data.hadMigraine=v;}, show:function(v){return v?'Sim':'Não';}
   },
   {
     id:'intensity', ask:'De zero a dez, qual foi a intensidade da dor?',
+    skipIf:function(){return !session.data.hadPain;},
+    skipValue:function(){return 0;},
     chips:[0,1,2,3,4,5,6,7,8,9,10].map(function(n){return {l:String(n),v:n};}), grid:true,
     parse:parseIntensity,
     apply:function(v){session.data.intensity=v;}, show:function(v){return v+'/10';}
   },
   {
-    id:'duration', ask:'Quanto tempo durou? Menos de uma hora, até quatro horas, até doze horas, até um dia, ou mais de um dia.',
+    id:'duration',
+    ask:function(){
+      return session.data.hadPain
+        ? 'Quanto tempo durou a dor? Menos de uma hora, até quatro horas, até doze horas, até um dia, ou mais de um dia.'
+        : 'Quanto tempo duraram os sintomas? Menos de uma hora, até quatro horas, até doze horas, até um dia, ou mais de um dia.';
+    },
+    skipIf:noSymptoms,
+    skipValue:function(){return 'Não se aplica';},
     chips:[{l:'< 1h',v:'< 1h'},{l:'1–4h',v:'1-4h'},{l:'4–12h',v:'4-12h'},{l:'12–24h',v:'12-24h'},{l:'> 24h',v:'> 24h'}],
     parse:function(t){
       var n=parseIntensity(t);
@@ -623,19 +628,23 @@ var STEPS=[
   },
   {
     id:'location', ask:'Onde doeu? Testa, laterais, nuca, olhos, pescoço ou a cabeça toda.',
+    skipIf:function(){return !session.data.hadPain;},
+    skipValue:function(){return 'Não se aplica';},
     chips:[{l:'Testa',v:'Frontal'},{l:'Laterais',v:'Temporal'},{l:'Nuca',v:'Occipital'},{l:'Olhos',v:'Olhos'},{l:'Pescoço',v:'Cervical'},{l:'Cabeça toda',v:'Generalizada'}],
     parse:function(t){return parseOption(t,{'testa':'Frontal','frontal':'Frontal','frente':'Frontal','lateral':'Temporal','laterais':'Temporal','temporal':'Temporal','lado':'Temporal','nuca':'Occipital','occipital':'Occipital','olho':'Olhos','olhos':'Olhos','pescoco':'Cervical','cervical':'Cervical','toda':'Generalizada','generalizada':'Generalizada','inteira':'Generalizada'});},
     apply:function(v){session.data.location=v;}, show:function(v){return v;}
   },
   {
     id:'medicine', ask:'Tomou algum remédio? Nenhum, dipirona, ibuprofeno, sumatriptano, naratriptano ou outro.',
+    skipIf:noSymptoms,
+    skipValue:function(){return 'Nenhum';},
     chips:[{l:'Nenhum',v:'Nenhum'},{l:'Dipirona',v:'Dipirona'},{l:'Ibuprofeno',v:'Ibuprofeno'},{l:'Sumatriptano',v:'Sumatriptano'},{l:'Naratriptano',v:'Naratriptano'},{l:'Outro',v:'Outro'}],
     parse:function(t){return parseOption(t,{'nenhum':'Nenhum','nada':'Nenhum','dipirona':'Dipirona','ibuprofeno':'Ibuprofeno','sumatriptano':'Sumatriptano','naratriptano':'Naratriptano','outro':'Outro'});},
     apply:function(v){session.data.medicine=v;}, show:function(v){return v;}
   },
   {
     id:'relief', ask:'Houve alívio? Sim, parcialmente ou não.',
-    skipIf:function(){return session.data.medicine==='Nenhum';},
+    skipIf:function(){return noSymptoms() || session.data.medicine==='Nenhum';},
     skipValue:function(){return 'Não tomou';},
     chips:[{l:'Sim',v:'Sim'},{l:'Parcialmente',v:'Parcialmente'},{l:'Não',v:'Não'}],
     parse:function(t){
@@ -648,6 +657,8 @@ var STEPS=[
   },
   {
     id:'triggers', ask:'Algum gatilho? Estresse, jejum, sono, menstruação, cafeína, álcool, alimentos, luz, clima, exercício — ou nenhum.',
+    skipIf:noSymptoms,
+    skipValue:function(){return [];},
     chips:[{l:'Estresse',v:'Estresse'},{l:'Jejum',v:'Jejum'},{l:'Sono',v:'Sono'},{l:'Menstruação',v:'Menstruação'},{l:'Cafeína',v:'Cafeína'},{l:'Álcool',v:'Álcool'},{l:'Alimentos',v:'Alimentos'},{l:'Luz/Odores',v:'Luzes/Odores'},{l:'Clima',v:'Clima'},{l:'Exercício',v:'Exercício'},{l:'Nenhum',v:'__none'}],
     multi:true,
     parse:function(t){
@@ -662,7 +673,14 @@ var STEPS=[
     show:function(v){return v.length?v.join(', '):'Nenhum';}
   },
   {
-    id:'limitation', ask:'A dor limitou suas atividades? Nenhuma limitação, leve, moderada ou grave.',
+    id:'limitation',
+    ask:function(){
+      return session.data.hadPain
+        ? 'A dor limitou suas atividades? Nenhuma limitação, leve, moderada ou grave.'
+        : 'Os sintomas limitaram suas atividades? Nenhuma limitação, leve, moderada ou grave.';
+    },
+    skipIf:noSymptoms,
+    skipValue:function(){return 'Nenhuma';},
     chips:[{l:'Nenhuma',v:'Nenhuma'},{l:'Leve',v:'Leve'},{l:'Moderada',v:'Moderada'},{l:'Grave',v:'Grave'}],
     parse:function(t){
       var v=parseOption(t,{'grave':'Grave','moderada':'Moderada','moderado':'Moderada','leve':'Leve','nenhuma':'Nenhuma','nenhum':'Nenhuma'});
@@ -719,9 +737,10 @@ function askStep(){
     askStep(); return;
   }
   session.retries=0;
-  bubble('q','('+(session.stepIndex+1)+'/'+STEPS.length+') '+step.ask);
+  var txt=askText(step);
+  bubble('q','('+(session.stepIndex+1)+'/'+STEPS.length+') '+txt);
   renderChips(step);
-  speak(step.ask, function(){
+  speak(txt, function(){
     if(document.getElementById('autoListenToggle').checked) startListening();
   });
 }
@@ -753,7 +772,7 @@ function handleAnswer(transcript){
     if(session.retries>=2){
       speak('Não consegui entender. Toque em uma das opções na tela.', null);
     } else {
-      speak('Não entendi. '+step.ask, function(){
+      speak('Não entendi. '+askText(step), function(){
         if(document.getElementById('autoListenToggle').checked) startListening();
       });
     }
@@ -764,7 +783,7 @@ function handleAnswer(transcript){
 
 function askStep2Repeat(){
   var step=currentStep();
-  speak(step.ask, function(){
+  speak(askText(step), function(){
     if(document.getElementById('autoListenToggle').checked) startListening();
   });
 }
@@ -773,7 +792,6 @@ function goBack(){
   if(session.stepIndex===0) return;
   stopListening();
   session.stepIndex--;
-  // pula de volta perguntas puladas automaticamente
   while(session.stepIndex>0 && STEPS[session.stepIndex].skipIf && STEPS[session.stepIndex].skipIf()){
     session.stepIndex--;
   }
@@ -801,8 +819,13 @@ function finishSession(){
   });
   saveEntries(entries);
   chipArea.innerHTML='';
-  bubble('ok','✅ Registro salvo!');
-  speak('Registro salvo com sucesso.', null);
+  if(!d.hadPain && !d.hadMigraine){
+    bubble('ok','✅ Dia sem sintomas registrado!');
+    speak('Dia sem sintomas registrado. Ótima notícia.', null);
+  } else {
+    bubble('ok','✅ Registro salvo!');
+    speak('Registro salvo com sucesso.', null);
+  }
   session.active=false;
   document.getElementById('startSessionBtn').style.display='block';
   document.getElementById('startSessionBtn').textContent='🎙️ Registrar outro dia';
@@ -833,7 +856,6 @@ function startSession(){
     askStep();
     return;
   }
-  // Um clique: pede o microfone e já começa. Se negar, segue só com toques.
   if(navigator.mediaDevices && navigator.mediaDevices.getUserMedia){
     navigator.mediaDevices.getUserMedia({audio:true}).then(function(stream){
       stream.getTracks().forEach(function(tr){tr.stop();});
@@ -894,7 +916,41 @@ setInterval(function(){
   if(hm!==rt) lastNotifiedMinute=null;
 },15000);
 
-/* ================= FORMULÁRIO MANUAL ================= */
+/* ================= FORMULÁRIO MANUAL =================
+   Mesma lógica condicional do assistente:
+   - sem dor → desabilita intensidade e localização
+   - sem dor e sem enxaqueca → desabilita duração, remédio,
+     alívio, gatilhos e limitação                         */
+function syncManualLogic(){
+  var pain=document.getElementById('manualPain').checked;
+  var mig=document.getElementById('manualMigraine').checked;
+  var none=!pain && !mig;
+  var intensity=document.getElementById('manualIntensity');
+  var loc=document.getElementById('manualLocation');
+  var dur=document.getElementById('manualDuration');
+  var med=document.getElementById('manualMedicine');
+  var rel=document.getElementById('manualRelief');
+  var trig=document.getElementById('manualTriggers');
+  var lim=document.getElementById('manualLimitation');
+
+  intensity.disabled=!pain;
+  loc.disabled=!pain;
+  if(!pain){
+    intensity.value=0;
+    document.getElementById('manualIntensityDisplay').textContent='0';
+    loc.value='Não se aplica';
+  }
+  dur.disabled=none; med.disabled=none; trig.disabled=none; lim.disabled=none;
+  if(none){
+    dur.value='Não se aplica'; med.value='Nenhum'; trig.value=''; lim.value='Nenhuma';
+  }
+  rel.disabled=none || med.value==='Nenhum';
+  if(rel.disabled) rel.value='Não tomou';
+}
+document.getElementById('manualPain').addEventListener('change', syncManualLogic);
+document.getElementById('manualMigraine').addEventListener('change', syncManualLogic);
+document.getElementById('manualMedicine').addEventListener('change', syncManualLogic);
+
 document.getElementById('manualDate').value=todayISO();
 document.getElementById('manualIntensity').addEventListener('input',function(){
   document.getElementById('manualIntensityDisplay').textContent=this.value;
@@ -925,6 +981,7 @@ document.getElementById('manualForm').addEventListener('submit',function(e){
   document.getElementById('manualDate').value=todayISO();
   document.getElementById('manualPain').checked=true;
   document.getElementById('manualIntensityDisplay').textContent='5';
+  syncManualLogic();
   switchTab('list');
 });
 
@@ -934,6 +991,11 @@ function renderLastPreview(){
   var c=document.getElementById('lastEntryPreview');
   if(!entries.length){ c.innerHTML='<div class="empty-state">Nenhum registro ainda.</div>'; return; }
   var l=entries[entries.length-1];
+  if(!l.hadPain && !l.hadMigraine){
+    c.innerHTML='<div class="list-item"><div class="date">📅 '+esc(brDate(l.date))+'</div>'+
+      '<div class="tags"><span style="color:var(--ok);">✨ Dia sem sintomas</span></div></div>';
+    return;
+  }
   c.innerHTML='<div class="list-item"><div class="date">📅 '+esc(brDate(l.date))+'</div>'+
     '<div class="tags"><span>💥 '+esc(l.intensity)+'/10</span><span>📍 '+esc(l.location)+'</span>'+
     '<span>💊 '+esc(l.medicine)+'</span><span>🔄 '+esc(l.relief)+'</span></div></div>';
@@ -945,13 +1007,22 @@ function renderList(){
   if(!entries.length){ c.innerHTML='<div class="empty-state">Nenhum registro. Comece pelo Assistente ou pelo Manual.</div>'; return; }
   var html='';
   entries.slice().reverse().forEach(function(e2){
+    var noSym=!e2.hadPain && !e2.hadMigraine;
     html+='<div class="list-item"><div class="flex-between">'+
       '<span class="date">📅 '+esc(brDate(e2.date))+'</span>'+
-      '<span class="pill'+(e2.hadPain?' pain':'')+'">'+(e2.hadPain?'Dor':'Sem dor')+'</span></div>'+
-      '<div class="tags"><span>💥 '+esc(e2.intensity)+'/10</span><span>⏱️ '+esc(e2.duration||'—')+'</span>'+
-      '<span>📍 '+esc(e2.location)+'</span><span>💊 '+esc(e2.medicine)+'</span><span>🔄 '+esc(e2.relief)+'</span>'+
-      (e2.triggers&&e2.triggers.length?'<span>🔹 '+esc(e2.triggers.slice(0,3).join(', '))+'</span>':'')+
-      '</div><button class="del-btn" onclick="window.deleteEntry('+e2.id+')">Excluir</button></div>';
+      '<span class="pill'+(e2.hadPain?' pain':'')+'">'+(e2.hadPain?'Dor':(e2.hadMigraine?'Enxaqueca s/ dor':'Sem sintomas'))+'</span></div>';
+    if(noSym){
+      html+='<div class="tags"><span style="color:var(--ok);">✨ Dia sem dor e sem enxaqueca</span></div>';
+    } else {
+      html+='<div class="tags">'+
+        (e2.hadPain?'<span>💥 '+esc(e2.intensity)+'/10</span>':'')+
+        '<span>⏱️ '+esc(e2.duration||'—')+'</span>'+
+        (e2.hadPain?'<span>📍 '+esc(e2.location)+'</span>':'')+
+        '<span>💊 '+esc(e2.medicine)+'</span><span>🔄 '+esc(e2.relief)+'</span>'+
+        (e2.triggers&&e2.triggers.length?'<span>🔹 '+esc(e2.triggers.slice(0,3).join(', '))+'</span>':'')+
+        '</div>';
+    }
+    html+='<button class="del-btn" onclick="window.deleteEntry('+e2.id+')">Excluir</button></div>';
   });
   c.innerHTML=html;
 }
@@ -973,9 +1044,11 @@ function renderSummary(){
   var total=filtered.length;
   var painDays=filtered.filter(function(e){return e.hadPain;}).length;
   var migDays=filtered.filter(function(e){return e.hadMigraine;}).length;
+  var freeDays=filtered.filter(function(e){return !e.hadPain && !e.hadMigraine;}).length;
   var intense=filtered.filter(function(e){return e.intensity>=7;}).length;
   var medDays=filtered.filter(function(e){return e.medicine&&e.medicine!=='Nenhum';}).length;
-  var avg=(filtered.reduce(function(a,e){return a+(e.intensity||0);},0)/total).toFixed(1);
+  var painEntries=filtered.filter(function(e){return e.hadPain;});
+  var avg=painEntries.length?(painEntries.reduce(function(a,e){return a+(e.intensity||0);},0)/painEntries.length).toFixed(1):'—';
   var daysInMonth=new Date(year,month,0).getDate();
   var byDay={};
   filtered.forEach(function(e){
@@ -994,9 +1067,10 @@ function renderSummary(){
     '<div class="stat-item"><div class="number">'+total+'</div><div class="label">Registros</div></div>'+
     '<div class="stat-item"><div class="number">'+painDays+'</div><div class="label">Dias c/ dor</div></div>'+
     '<div class="stat-item"><div class="number">'+migDays+'</div><div class="label">Enxaqueca</div></div>'+
+    '<div class="stat-item"><div class="number" style="color:var(--ok);">'+freeDays+'</div><div class="label">Sem sintomas</div></div>'+
     '<div class="stat-item"><div class="number">'+intense+'</div><div class="label">Intensas (≥7)</div></div>'+
     '<div class="stat-item"><div class="number">'+medDays+'</div><div class="label">C/ medicação</div></div>'+
-    '<div class="stat-item"><div class="number">'+avg+'</div><div class="label">Média</div></div>'+
+    '<div class="stat-item"><div class="number">'+avg+'</div><div class="label">Média (dias c/ dor)</div></div>'+
     '</div>'+chart;
 }
 
